@@ -1,0 +1,502 @@
+.. only:: html
+
+    .. note::
+        :class: sphx-glr-download-link-note
+
+        Click :ref:`here <sphx_glr_download_tutorials_ch5_probabilistic_modeling_ch5_2_introduction_pymc3.py>`     to download the full example code
+    .. rst-class:: sphx-glr-example-title
+
+    .. _sphx_glr_tutorials_ch5_probabilistic_modeling_ch5_2_introduction_pymc3.py:
+
+
+5 2 - Introduction PyMC3.
+=========================
+
+
+.. code-block:: python3
+
+
+    # Importing GemPy
+    import gempy as gp
+
+    # Importing auxiliary libraries
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import pymc3 as pm
+    import arviz as az
+
+    from gempy.bayesian import plot_posterior as pp
+    from importlib import reload
+    from matplotlib.ticker import StrMethodFormatter
+
+
+
+
+
+
+
+
+Model definition
+----------------
+
+
+This is to make it work in sphinx gallery
+
+
+.. code-block:: python3
+
+    cwd = os.getcwd()
+    if not 'examples' in cwd:
+        path_dir = os.getcwd()+'/examples/tutorials/ch5_probabilistic_modeling'
+    else:
+        path_dir = cwd
+
+
+
+
+
+
+
+
+
+.. code-block:: python3
+
+    geo_model = gp.load_model(r'/2-layers', path=path_dir, recompile=True)
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ Out:
+
+ .. code-block:: none
+
+    Active grids: ['regular']
+    Active grids: ['regular' 'topography']
+    Setting kriging parameters to their default values.
+    Compiling theano function...
+    Level of Optimization:  fast_compile
+    Device:  cpu
+    Precision:  float64
+    Number of faults:  0
+    Compilation Done!
+    Kriging values: 
+                       values
+    range            1.3e+04
+    $C_o$            4.2e+06
+    drift equations      [3]
+
+
+
+
+
+.. code-block:: python3
+
+    geo_model.modify_surface_points(2, Z=1000)
+    gp.compute_model(geo_model)
+
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ Out:
+
+ .. code-block:: none
+
+
+
+    Lithology ids 
+      [3. 3. 3. ... 1. 1. 1.] 
+
+
+
+
+
+.. code-block:: python3
+
+
+    def plot_geo_setting_well():
+        device_loc = np.array([[6e3, 0, 3700]])
+        p2d = gp.plot_2d(geo_model, show_topography=True, legend=False)
+
+        well_1 = 3.41e3
+        well_2 = 3.6e3
+        p2d.axes[0].scatter([3e3], [well_1], marker='^', s=400, c='#71a4b3', zorder=10)
+        p2d.axes[0].scatter([9e3], [well_2], marker='^', s=400, c='#71a4b3', zorder=10)
+        p2d.axes[0].scatter(device_loc[:, 0], device_loc[:, 2], marker='x', s=400, c='#DA8886', zorder=10)
+
+        p2d.axes[0].vlines(3e3, .5e3, well_1, linewidth=4, color='gray')
+        p2d.axes[0].vlines(9e3, .5e3, well_2, linewidth=4, color='gray')
+        p2d.axes[0].vlines(3e3, .5e3, well_1)
+        p2d.axes[0].vlines(9e3, .5e3, well_2)
+        p2d.axes[0].set_xlim(2900, 3100)
+        plt.savefig('well.svg')
+        plt.show()
+
+
+
+
+
+
+
+
+
+
+.. code-block:: python3
+
+    plot_geo_setting_well()
+
+    # Thickness measurements
+    # ----------------------
+
+
+
+
+.. image:: /tutorials/ch5_probabilistic_modeling/images/sphx_glr_ch5_2_introduction_pymc3_001.png
+    :alt: Cell Number: mid Direction: y
+    :class: sphx-glr-single-img
+
+
+
+
+
+
+.. code-block:: python3
+
+    y_obs = [2.12]
+    y_obs_list = [2.12, 2.06, 2.08, 2.05, 2.08, 2.09,
+                  2.19, 2.07, 2.16, 2.11, 2.13, 1.92]
+    np.random.seed(4003)
+
+
+
+
+
+
+
+
+Normal-several points
+~~~~~~~~~~~~~~~~~~~~~
+.. image:: /../../_static/computational_graph1.png
+
+
+
+.. code-block:: python3
+
+    with pm.Model() as model:
+        mu = pm.Normal('$\mu$', 2.08, .07)
+        sigma = pm.Gamma('$\sigma$', 0.3, 3)
+        y = pm.Normal('$y$', mu, sigma, observed=y_obs_list)
+
+
+
+
+
+
+
+
+
+.. code-block:: python3
+
+    mu
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ Out:
+
+ .. code-block:: none
+
+
+    $\mu$
+
+
+
+
+.. code-block:: python3
+
+    sigma
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ Out:
+
+ .. code-block:: none
+
+
+    $\sigma$
+
+
+
+
+.. code-block:: python3
+
+    y
+
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ Out:
+
+ .. code-block:: none
+
+
+    $y$
+
+
+
+Sampling
+--------
+
+
+
+.. code-block:: python3
+
+    with model:
+        prior = pm.sample_prior_predictive(1000)
+        trace = pm.sample(1000, discard_tuned_samples=False, cores=1)
+        post = pm.sample_posterior_predictive(trace)
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ Out:
+
+ .. code-block:: none
+
+    Auto-assigning NUTS sampler...
+    Initializing NUTS using jitter+adapt_diag...
+    Sequential sampling (2 chains in 1 job)
+    NUTS: [$\sigma$, $\mu$]
+    Sampling chain 0, 0 divergences:   0%|          | 0/1500 [00:00<?, ?it/s]    Sampling chain 0, 0 divergences:   3%|2         | 38/1500 [00:00<00:03, 378.76it/s]    Sampling chain 0, 0 divergences:   4%|4         | 62/1500 [00:00<00:04, 322.40it/s]    Sampling chain 0, 0 divergences:   7%|6         | 104/1500 [00:00<00:04, 341.40it/s]    Sampling chain 0, 0 divergences:  11%|#         | 162/1500 [00:00<00:03, 388.65it/s]    Sampling chain 0, 0 divergences:  16%|#5        | 238/1500 [00:00<00:02, 455.37it/s]    Sampling chain 0, 0 divergences:  23%|##3       | 345/1500 [00:00<00:02, 550.18it/s]    Sampling chain 0, 0 divergences:  30%|###       | 452/1500 [00:00<00:01, 643.93it/s]    Sampling chain 0, 0 divergences:  38%|###8      | 572/1500 [00:00<00:01, 747.81it/s]    Sampling chain 0, 0 divergences:  47%|####7     | 708/1500 [00:00<00:00, 863.41it/s]    Sampling chain 0, 0 divergences:  56%|#####5    | 837/1500 [00:01<00:00, 958.01it/s]    Sampling chain 0, 0 divergences:  64%|######4   | 963/1500 [00:01<00:00, 1030.29it/s]    Sampling chain 0, 0 divergences:  73%|#######2  | 1090/1500 [00:01<00:00, 1091.37it/s]    Sampling chain 0, 0 divergences:  81%|########  | 1211/1500 [00:01<00:00, 1123.77it/s]    Sampling chain 0, 0 divergences:  89%|########9 | 1336/1500 [00:01<00:00, 1157.66it/s]    Sampling chain 0, 0 divergences:  97%|#########7| 1458/1500 [00:01<00:00, 1173.15it/s]    Sampling chain 0, 0 divergences: 100%|##########| 1500/1500 [00:01<00:00, 969.69it/s] 
+    Sampling chain 1, 0 divergences:   0%|          | 0/1500 [00:00<?, ?it/s]    Sampling chain 1, 0 divergences:   6%|6         | 95/1500 [00:00<00:01, 945.13it/s]    Sampling chain 1, 0 divergences:  14%|#3        | 205/1500 [00:00<00:01, 985.21it/s]    Sampling chain 1, 0 divergences:  22%|##1       | 326/1500 [00:00<00:01, 1042.41it/s]    Sampling chain 1, 0 divergences:  29%|##9       | 441/1500 [00:00<00:00, 1069.88it/s]    Sampling chain 1, 0 divergences:  38%|###8      | 573/1500 [00:00<00:00, 1134.05it/s]    Sampling chain 1, 0 divergences:  47%|####6     | 700/1500 [00:00<00:00, 1171.30it/s]    Sampling chain 1, 0 divergences:  56%|#####5    | 836/1500 [00:00<00:00, 1222.06it/s]    Sampling chain 1, 0 divergences:  64%|######4   | 963/1500 [00:00<00:00, 1235.95it/s]    Sampling chain 1, 0 divergences:  74%|#######3  | 1103/1500 [00:00<00:00, 1279.25it/s]    Sampling chain 1, 0 divergences:  82%|########2 | 1236/1500 [00:01<00:00, 1293.26it/s]    Sampling chain 1, 0 divergences:  91%|#########1| 1368/1500 [00:01<00:00, 1299.71it/s]    Sampling chain 1, 0 divergences: 100%|##########| 1500/1500 [00:01<00:00, 1302.92it/s]    Sampling chain 1, 0 divergences: 100%|##########| 1500/1500 [00:01<00:00, 1243.45it/s]
+      0%|          | 0/3000 [00:00<?, ?it/s]      5%|4         | 139/3000 [00:00<00:02, 1382.04it/s]     10%|9         | 289/3000 [00:00<00:01, 1415.27it/s]     15%|#4        | 440/3000 [00:00<00:01, 1441.29it/s]     20%|#9        | 590/3000 [00:00<00:01, 1456.86it/s]     25%|##4       | 741/3000 [00:00<00:01, 1469.84it/s]     30%|##9       | 891/3000 [00:00<00:01, 1476.17it/s]     35%|###4      | 1042/3000 [00:00<00:01, 1484.02it/s]     40%|###9      | 1185/3000 [00:00<00:01, 1465.72it/s]     44%|####4     | 1327/3000 [00:00<00:01, 1450.53it/s]     49%|####8     | 1468/3000 [00:01<00:01, 1435.33it/s]     54%|#####3    | 1610/3000 [00:01<00:00, 1430.37it/s]     58%|#####8    | 1752/3000 [00:01<00:00, 1424.57it/s]     63%|######3   | 1894/3000 [00:01<00:00, 1421.68it/s]     68%|######7   | 2036/3000 [00:01<00:00, 1419.63it/s]     73%|#######2  | 2178/3000 [00:01<00:00, 1417.91it/s]     77%|#######7  | 2321/3000 [00:01<00:00, 1418.45it/s]     82%|########2 | 2464/3000 [00:01<00:00, 1419.09it/s]     87%|########6 | 2606/3000 [00:01<00:00, 1418.72it/s]     92%|#########1| 2755/3000 [00:01<00:00, 1438.83it/s]     97%|#########6| 2906/3000 [00:02<00:00, 1458.09it/s]    100%|##########| 3000/3000 [00:02<00:00, 1449.06it/s]
+
+
+
+
+
+.. code-block:: python3
+
+
+    data = az.from_pymc3(trace=trace,
+                         prior=prior,
+                         posterior_predictive=post)
+
+
+
+
+
+
+
+
+
+.. code-block:: python3
+
+    az.plot_trace(data)
+    plt.show()
+
+
+
+
+.. image:: /tutorials/ch5_probabilistic_modeling/images/sphx_glr_ch5_2_introduction_pymc3_002.png
+    :alt: $\mu$, $\mu$, $\sigma$, $\sigma$
+    :class: sphx-glr-single-img
+
+
+
+
+
+Raw observations:
+^^^^^^^^^^^^^^^^^
+
+
+
+.. code-block:: python3
+
+
+    reload(pp)
+    p = pp.PlotPosterior(data)
+    p.create_figure(figsize=(9, 3), joyplot=False, marginal=False)
+    p.plot_normal_likelihood('$\mu$', '$\sigma$', '$y$', iteration=-1, hide_bell=True)
+    p.likelihood_axes.set_xlim(1.90, 2.2)
+    p.likelihood_axes.xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
+    for tick in p.likelihood_axes.get_xticklabels():
+        tick.set_rotation(45)
+    plt.show()
+
+
+
+
+.. image:: /tutorials/ch5_probabilistic_modeling/images/sphx_glr_ch5_2_introduction_pymc3_003.png
+    :alt: Likelihood
+    :class: sphx-glr-single-img
+
+
+
+
+
+Final inference
+^^^^^^^^^^^^^^^
+
+
+
+.. code-block:: python3
+
+
+    reload(pp)
+    p = pp.PlotPosterior(data)
+    p.create_figure(figsize=(9, 3), joyplot=False, marginal=False)
+    p.plot_normal_likelihood('$\mu$', '$\sigma$', '$y$', iteration=-1, hide_lines=True)
+    p.likelihood_axes.set_xlim(1.70, 2.40)
+    p.likelihood_axes.xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
+    for tick in p.likelihood_axes.get_xticklabels():
+        tick.set_rotation(45)
+    plt.show()
+
+
+
+
+.. image:: /tutorials/ch5_probabilistic_modeling/images/sphx_glr_ch5_2_introduction_pymc3_004.png
+    :alt: Likelihood
+    :class: sphx-glr-single-img
+
+
+
+
+
+Joyplot
+~~~~~~~
+
+
+%matplotlib inline
+
+
+.. code-block:: python3
+
+    reload(pp)
+    p = pp.PlotPosterior(data)
+
+    p.create_figure(figsize=(9, 9), joyplot=True, marginal=False, likelihood=False, n_samples=31)
+    p.plot_joy(('$\mu$', '$\sigma$'), '$y$', iteration=14)
+    plt.show()
+
+
+
+
+.. image:: /tutorials/ch5_probabilistic_modeling/images/sphx_glr_ch5_2_introduction_pymc3_005.png
+    :alt: ch5 2 introduction pymc3
+    :class: sphx-glr-single-img
+
+
+
+
+
+Join probability
+~~~~~~~~~~~~~~~~
+
+
+sphinx_gallery_thumbnail_number = 6
+
+
+.. code-block:: python3
+
+    reload(pp)
+    p = pp.PlotPosterior(data)
+
+    p.create_figure(figsize=(9, 5), joyplot=False, marginal=True, likelihood=True)
+    p.plot_marginal(var_names=['$\mu$', '$\sigma$'],
+                    plot_trace=False, credible_interval=.93, kind='kde')
+
+    p.plot_normal_likelihood('$\mu$', '$\sigma$', '$y$', iteration=-1, hide_lines=True)
+    p.likelihood_axes.set_xlim(1.70, 2.40)
+    plt.show()
+
+
+
+
+.. image:: /tutorials/ch5_probabilistic_modeling/images/sphx_glr_ch5_2_introduction_pymc3_006.png
+    :alt: Likelihood
+    :class: sphx-glr-single-img
+
+
+
+
+
+Full plot
+~~~~~~~~~
+
+
+
+.. code-block:: python3
+
+    reload(pp)
+    p = pp.PlotPosterior(data)
+
+    p.create_figure(figsize=(9, 5), joyplot=True, marginal=True, likelihood=True, n_samples=11)
+
+    p.plot_posterior(['$\mu$', '$\sigma$'], ['$\mu$', '$\sigma$'], '$y$', 1000,
+                     marginal_kwargs={'plot_trace': False, 'credible_interval': .93, 'kind': 'kde'})
+    plt.show()
+
+
+.. image:: /tutorials/ch5_probabilistic_modeling/images/sphx_glr_ch5_2_introduction_pymc3_007.png
+    :alt: Likelihood
+    :class: sphx-glr-single-img
+
+
+
+
+
+
+.. rst-class:: sphx-glr-timing
+
+   **Total running time of the script:** ( 0 minutes  44.800 seconds)
+
+
+.. _sphx_glr_download_tutorials_ch5_probabilistic_modeling_ch5_2_introduction_pymc3.py:
+
+
+.. only :: html
+
+ .. container:: sphx-glr-footer
+    :class: sphx-glr-footer-example
+
+
+
+  .. container:: sphx-glr-download sphx-glr-download-python
+
+     :download:`Download Python source code: ch5_2_introduction_pymc3.py <ch5_2_introduction_pymc3.py>`
+
+
+
+  .. container:: sphx-glr-download sphx-glr-download-jupyter
+
+     :download:`Download Jupyter notebook: ch5_2_introduction_pymc3.ipynb <ch5_2_introduction_pymc3.ipynb>`
+
+
+.. only:: html
+
+ .. rst-class:: sphx-glr-signature
+
+    `Gallery generated by Sphinx-Gallery <https://sphinx-gallery.github.io>`_
